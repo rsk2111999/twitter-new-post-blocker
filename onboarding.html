@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Twitter Post Blocker — Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "TwitterChirp", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Helvetica, Arial, sans-serif;
+      background: #000;
+      color: #e7e9ea;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page { width: 100%; max-width: 400px; }
+
+    /* ── Logo ── */
+    .logo { display: flex; justify-content: center; margin-bottom: 32px; }
+
+    /* ── Heading ── */
+    h1 {
+      font-size: 31px;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: #71767b;
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 36px;
+    }
+
+    /* ── Option cards ── */
+    .options { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
+
+    /* Thin connecting line between options — Twitter uses a bordered group */
+    .options-group {
+      border: 1px solid #2f3336;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-bottom: 1px solid #2f3336;
+      position: relative;
+      user-select: none;
+    }
+    .option:last-child { border-bottom: none; }
+    .option:hover { background: #080808; }
+    .option.selected { background: #080808; }
+    .option input[type="radio"] { display: none; }
+
+    .option-icon {
+      font-size: 20px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .option-copy { flex: 1; min-width: 0; }
+    .option-copy strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      color: #e7e9ea;
+      margin-bottom: 1px;
+    }
+    .option-copy span {
+      font-size: 13px;
+      color: #71767b;
+      line-height: 1.4;
+    }
+
+    /* Twitter-style radio circle */
+    .radio-circle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid #536471;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s;
+    }
+    .radio-circle::after {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #1d9bf0;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .option.selected .radio-circle {
+      border-color: #1d9bf0;
+    }
+    .option.selected .radio-circle::after {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* ── Time pickers (inside group, revealed on schedule select) ── */
+    .time-option {
+      display: none;
+      padding: 12px 16px 16px;
+      background: #000;
+      border-top: 1px solid #2f3336;
+    }
+    .time-option.visible { display: block; }
+    .time-option-label {
+      font-size: 13px;
+      color: #71767b;
+      margin-bottom: 12px;
+    }
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .time-field { flex: 1; }
+    .time-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 400;
+      color: #71767b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .time-field-inner {
+      border: 2px solid #333639;
+      border-radius: 4px;
+      padding: 10px 12px;
+      background: #000;
+      transition: border-color 0.2s;
+    }
+    .time-field-inner:focus-within { border-color: #1d9bf0; }
+    .time-field input[type="time"] {
+      width: 100%;
+      background: none;
+      border: none;
+      outline: none;
+      color: #e7e9ea;
+      font-size: 15px;
+      font-family: inherit;
+      cursor: pointer;
+      color-scheme: dark;
+    }
+    .time-sep {
+      font-size: 20px;
+      color: #2f3336;
+      margin-top: 18px;
+      flex-shrink: 0;
+    }
+
+    /* ── CTA button ── */
+    .btn {
+      width: 100%;
+      height: 52px;
+      background: #1d9bf0;
+      color: #fff;
+      border: none;
+      border-radius: 9999px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+      margin-bottom: 16px;
+      letter-spacing: 0;
+    }
+    .btn:hover { background: #1a8cd8; }
+    .btn:active { background: #1677b3; }
+
+    /* ── Footer ── */
+    .footer {
+      font-size: 13px;
+      color: #536471;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="logo">
+      <svg viewBox="0 0 24 24" width="34" height="34" fill="#e7e9ea">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+    </div>
+
+    <h1>Take back your feed</h1>
+    <p class="subtitle">Choose when to stop new posts from loading. You can change this any time from the extension icon.</p>
+
+    <div class="options-group">
+
+      <label class="option selected" id="opt-always">
+        <input type="radio" name="mode" value="always" checked />
+        <div class="option-icon">🔒</div>
+        <div class="option-copy">
+          <strong>Always block</strong>
+          <span>New posts never appear. Maximum peace.</span>
+        </div>
+        <div class="radio-circle"></div>
+      </label>
+
+      <label class="option" id="opt-schedule">
+        <input type="radio" name="mode" value="schedule" />
+        <div class="option-icon">🕐</div>
+        <div class="option-copy">
+          <strong>Block on a schedule</strong>
+          <span>Set specific hours — like during work.</span>
+        </div>
+        <div class="radio-circle"></div>
+      </label>
+
+      <!-- Time pickers, shown when schedule is selected -->
+      <div class="time-option" id="timePickers">
+        <p class="time-option-label">Block new posts between these hours</p>
+        <div class="time-row">
+          <div class="time-field">
+            <label>From</label>
+            <div class="time-field-inner">
+              <input type="time" id="startTime" value="09:00" />
+            </div>
+          </div>
+          <span class="time-sep">—</span>
+          <div class="time-field">
+            <label>To</label>
+            <div class="time-field-inner">
+              <input type="time" id="endTime" value="18:00" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <label class="option" id="opt-off">
+        <input type="radio" name="mode" value="off" />
+        <div class="option-icon">👋</div>
+        <div class="option-copy">
+          <strong>Keep off for now</strong>
+          <span>Posts load normally. Enable later from the icon.</span>
+        </div>
+        <div class="radio-circle"></div>
+      </label>
+
+    </div>
+
+    <button class="btn" id="saveBtn">Get started</button>
+    <p class="footer">You can adjust this any time by clicking the extension icon in your toolbar.</p>
+
+  </div>
+  <script src="onboarding.js"></script>
+</body>
+</html>
