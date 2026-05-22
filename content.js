@@ -274,6 +274,146 @@ chrome.storage.sync.get(
   }
 );
 
+// ── Digest panel ─────────────────────────────────────────────────────────────
+let digestPanel = null;
+
+function getOrCreatePanel() {
+  if (digestPanel && document.body.contains(digestPanel)) return digestPanel;
+
+  digestPanel = document.createElement('div');
+  digestPanel.id = 'rzp-digest-panel';
+  Object.assign(digestPanel.style, {
+    position: 'fixed',
+    top: '0',
+    right: '0',
+    width: '340px',
+    height: '100vh',
+    background: '#000',
+    borderLeft: '1px solid #2f3336',
+    zIndex: '999997',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: '"TwitterChirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    transform: 'translateX(100%)',
+    transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+    overflowY: 'auto',
+  });
+
+  document.body.appendChild(digestPanel);
+  // slide in
+  requestAnimationFrame(() => {
+    digestPanel.style.transform = 'translateX(0)';
+  });
+  return digestPanel;
+}
+
+function closePanel() {
+  if (!digestPanel) return;
+  digestPanel.style.transform = 'translateX(100%)';
+  setTimeout(() => { digestPanel?.remove(); digestPanel = null; }, 280);
+}
+
+function panelHeader(title) {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid #2f3336;position:sticky;top:0;background:#000;z-index:1">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="#e7e9ea">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+        <span style="font-size:15px;font-weight:800;color:#e7e9ea">${title}</span>
+      </div>
+      <button id="digest-close-btn" style="background:none;border:none;cursor:pointer;padding:6px;border-radius:50%;color:#71767b;display:flex;align-items:center;justify-content:center;transition:background 0.15s"
+        onmouseover="this.style.background='rgba(239,243,244,0.1)'" onmouseout="this.style.background='none'">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <path d="M10.59 12L4.54 5.96l1.42-1.42L12 10.59l6.04-6.05 1.42 1.42L13.41 12l6.05 6.04-1.42 1.42L12 13.41l-6.04 6.05-1.42-1.42L10.59 12z"/>
+        </svg>
+      </button>
+    </div>`;
+}
+
+function showDigestLoading() {
+  const panel = getOrCreatePanel();
+  panel.innerHTML = panelHeader('Feed Digest') + `
+    <div style="padding:20px 16px">
+      ${[1,2,3].map(() => `
+        <div style="margin-bottom:24px">
+          <div style="height:14px;width:80px;background:#1a1a1a;border-radius:4px;margin-bottom:12px;animation:pulse 1.2s ease-in-out infinite"></div>
+          ${[1,2,3].map(() => `<div style="height:11px;background:#1a1a1a;border-radius:4px;margin-bottom:7px;animation:pulse 1.2s ease-in-out infinite"></div>`).join('')}
+        </div>`).join('')}
+    </div>
+    <style>
+      @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.9} }
+    </style>`;
+  panel.querySelector('#digest-close-btn').addEventListener('click', closePanel);
+}
+
+function showDigest(digest) {
+  const panel = getOrCreatePanel();
+  const now = new Date();
+  const timeStr = `${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2,'0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
+
+  const topicsHtml = (digest.topics || []).map(t => `
+    <div style="margin-bottom:20px">
+      <div style="font-size:12px;font-weight:700;color:#1d9bf0;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">${t.name}</div>
+      ${(t.bullets || []).map(b => `
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start">
+          <div style="width:5px;height:5px;border-radius:50%;background:#2f3336;flex-shrink:0;margin-top:6px"></div>
+          <div style="font-size:13px;color:#e7e9ea;line-height:1.5">${b}</div>
+        </div>`).join('')}
+    </div>`).join('');
+
+  const noTopics = !digest.topics || digest.topics.length === 0;
+
+  panel.innerHTML = panelHeader('Feed Digest') + `
+    <div style="padding:16px 16px 24px">
+      <div style="font-size:11px;color:#536471;margin-bottom:16px">
+        ${digest.total_tweets_analyzed || 0} tweets · ${timeStr}
+      </div>
+      ${noTopics
+        ? `<div style="font-size:13px;color:#71767b;font-style:italic;text-align:center;padding:40px 0">Nothing matched your topics in this feed.<br><span style="font-size:12px;color:#536471">Try scrolling a bit more and regenerating.</span></div>`
+        : topicsHtml}
+    </div>`;
+  panel.querySelector('#digest-close-btn').addEventListener('click', closePanel);
+}
+
+function showDigestError(error) {
+  const panel = getOrCreatePanel();
+  panel.innerHTML = panelHeader('Feed Digest') + `
+    <div style="padding:40px 20px;text-align:center">
+      <div style="font-size:22px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:14px;font-weight:700;color:#e7e9ea;margin-bottom:8px">Something went wrong</div>
+      <div style="font-size:13px;color:#71767b;line-height:1.5">${error}</div>
+    </div>`;
+  panel.querySelector('#digest-close-btn').addEventListener('click', closePanel);
+}
+
+function collectVisibleTweets() {
+  const articles = document.querySelectorAll('article[data-testid="tweet"]');
+  const tweets = [];
+  articles.forEach((article) => {
+    const id = getTweetId(article);
+    if (!id) return;
+    const author = getTweetAuthor(article) || 'unknown';
+    const textEl = article.querySelector('[data-testid="tweetText"]');
+    const text = textEl ? textEl.innerText.trim() : '';
+    if (!text) return;
+    tweets.push({ id, author, text: text.slice(0, 280) });
+  });
+  return tweets;
+}
+
+// ── Message listener (from background / popup) ────────────────────────────────
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'collectTweets') {
+    sendResponse({ tweets: collectVisibleTweets() });
+    return true;
+  }
+  if (msg.type === 'showDigestLoading') { showDigestLoading(); return; }
+  if (msg.type === 'showDigest')        { showDigest(msg.digest); return; }
+  if (msg.type === 'showDigestError')   { showDigestError(msg.error); return; }
+});
+
+// ── Storage listener ──────────────────────────────────────────────────────────
 chrome.storage.sync.onChanged.addListener((changes) => {
   if ('enabled'         in changes) enabled         = changes.enabled.newValue;
   if ('scheduleEnabled' in changes) scheduleEnabled = changes.scheduleEnabled.newValue;

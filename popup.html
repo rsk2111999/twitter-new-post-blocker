@@ -289,6 +289,114 @@
       font-family: inherit;
     }
 
+    /* ── Digest ── */
+    .digest-section { padding: 10px 16px 14px; }
+    .digest-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .digest-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #71767b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .digest-api-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .digest-api-wrap {
+      flex: 1;
+      border: 2px solid #333639;
+      border-radius: 4px;
+      padding: 6px 10px;
+      background: #000;
+      transition: border-color 0.2s;
+    }
+    .digest-api-wrap:focus-within { border-color: #1d9bf0; }
+    .digest-api-input {
+      width: 100%;
+      background: none;
+      border: none;
+      outline: none;
+      color: #e7e9ea;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .digest-api-input::placeholder { color: #536471; }
+    .digest-save-btn {
+      background: none;
+      border: 1px solid #2f3336;
+      border-radius: 9999px;
+      color: #1d9bf0;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 0 12px;
+      height: 28px;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .digest-save-btn:hover { background: #0d1117; }
+    .digest-topics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .topic-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #16202a;
+      border: 1px solid #2f3336;
+      border-radius: 9999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      color: #71767b;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .topic-chip.selected {
+      border-color: #1d9bf0;
+      color: #1d9bf0;
+      background: #031018;
+    }
+    .digest-generate-btn {
+      width: 100%;
+      height: 36px;
+      background: #1d9bf0;
+      border: none;
+      border-radius: 9999px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .digest-generate-btn:hover { background: #1a8cd8; }
+    .digest-generate-btn:disabled { background: #1a3a4a; color: #536471; cursor: default; }
+    .digest-no-key {
+      font-size: 11px;
+      color: #536471;
+      font-style: italic;
+      text-align: center;
+      padding: 4px 0 2px;
+    }
+    .digest-no-key a { color: #1d9bf0; text-decoration: none; }
+
     /* ── Status ── */
     .status-bar {
       padding: 10px 16px 12px;
@@ -426,6 +534,45 @@
       </div>
       <button class="allowlist-confirm" id="allowlistConfirm">Add</button>
     </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- AI Digest -->
+  <div class="digest-section">
+    <div class="digest-header">
+      <span class="digest-title">✦ AI Digest</span>
+    </div>
+
+    <!-- API key row -->
+    <div class="digest-api-row">
+      <div class="digest-api-wrap">
+        <input class="digest-api-input" id="digestApiKey" type="password"
+          placeholder="sk-ant-… (your Anthropic API key)" autocomplete="off" />
+      </div>
+      <button class="digest-save-btn" id="digestSaveKey">Save</button>
+    </div>
+
+    <!-- Topic chips -->
+    <div class="digest-topics" id="digestTopics">
+      <span class="topic-chip selected" data-topic="AI & ML">AI & ML</span>
+      <span class="topic-chip selected" data-topic="Tech">Tech</span>
+      <span class="topic-chip" data-topic="Stocks">Stocks</span>
+      <span class="topic-chip" data-topic="Crypto">Crypto</span>
+      <span class="topic-chip" data-topic="World">World</span>
+      <span class="topic-chip" data-topic="Sports">Sports</span>
+    </div>
+
+    <!-- Generate button -->
+    <button class="digest-generate-btn" id="digestGenerateBtn" disabled>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+      </svg>
+      Generate Digest
+    </button>
+    <p class="digest-no-key" id="digestNoKeyHint" style="display:none">
+      Add your <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic API key</a> to use this feature
+    </p>
   </div>
 
   <div class="status-bar">

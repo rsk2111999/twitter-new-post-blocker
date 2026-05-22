@@ -23,6 +23,13 @@ const breakActive    = document.getElementById('breakActive');
 const breakTime      = document.getElementById('breakTime');
 const breakCancel    = document.getElementById('breakCancel');
 
+// Digest
+const digestApiKey      = document.getElementById('digestApiKey');
+const digestSaveKey     = document.getElementById('digestSaveKey');
+const digestTopics      = document.getElementById('digestTopics');
+const digestGenerateBtn = document.getElementById('digestGenerateBtn');
+const digestNoKeyHint   = document.getElementById('digestNoKeyHint');
+
 // Allowlist
 const allowlistChips    = document.getElementById('allowlistChips');
 const allowlistEmpty    = document.getElementById('allowlistEmpty');
@@ -217,6 +224,80 @@ function save() {
 
 [toggle, schedToggle].forEach(el => el.addEventListener('change', save));
 [startTimeEl, endTimeEl].forEach(el => el.addEventListener('change', save));
+
+// ── Digest ────────────────────────────────────────────────────────────────────
+function getSelectedTopics() {
+  return [...digestTopics.querySelectorAll('.topic-chip.selected')]
+    .map(c => c.dataset.topic);
+}
+
+function setDigestReady(hasKey) {
+  digestGenerateBtn.disabled = !hasKey;
+  digestNoKeyHint.style.display = hasKey ? 'none' : 'block';
+}
+
+// Topic chip toggles
+digestTopics.addEventListener('click', (e) => {
+  const chip = e.target.closest('.topic-chip');
+  if (!chip) return;
+  chip.classList.toggle('selected');
+  // Save selection
+  const selected = getSelectedTopics();
+  chrome.storage.local.set({ digestTopics: selected });
+});
+
+// Save / update API key
+digestSaveKey.addEventListener('click', () => {
+  const val = digestApiKey.value.trim();
+  if (!val) return;
+  chrome.storage.local.set({ digestApiKey: val }, () => {
+    setDigestReady(true);
+    digestApiKey.value = '';
+    digestSaveKey.textContent = 'Saved ✓';
+    setTimeout(() => { digestSaveKey.textContent = 'Save'; }, 1800);
+  });
+});
+digestApiKey.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') digestSaveKey.click();
+});
+
+// Generate digest
+digestGenerateBtn.addEventListener('click', () => {
+  chrome.storage.local.get({ digestApiKey: '', digestTopics: ['AI & ML', 'Tech'] }, ({ digestApiKey: key, digestTopics: topics }) => {
+    if (!key) { setDigestReady(false); return; }
+
+    const activeTopics = getSelectedTopics().length > 0 ? getSelectedTopics() : topics;
+
+    digestGenerateBtn.disabled = true;
+    digestGenerateBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="animation:spin 0.8s linear infinite"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg> Generating…`;
+
+    // Inject spin animation if not present
+    if (!document.getElementById('spin-style')) {
+      const s = document.createElement('style');
+      s.id = 'spin-style';
+      s.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(s);
+    }
+
+    chrome.runtime.sendMessage({ type: 'generateDigest', apiKey: key, topics: activeTopics }, () => {
+      digestGenerateBtn.disabled = false;
+      digestGenerateBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Generate Digest`;
+      window.close(); // close popup so user can see the panel
+    });
+  });
+});
+
+// Boot digest state
+chrome.storage.local.get({ digestApiKey: '', digestTopics: ['AI & ML', 'Tech'] }, ({ digestApiKey: key, digestTopics: savedTopics }) => {
+  setDigestReady(!!key);
+  if (key) {
+    digestApiKey.placeholder = '••••••••••••••••• (saved)';
+  }
+  // Restore topic selection
+  digestTopics.querySelectorAll('.topic-chip').forEach((chip) => {
+    chip.classList.toggle('selected', savedTopics.includes(chip.dataset.topic));
+  });
+});
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 chrome.storage.sync.get(
