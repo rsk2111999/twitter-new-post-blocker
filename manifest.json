@@ -4,7 +4,7 @@
   "version": "1.0",
   "description": "Prevents new posts from appearing in your Twitter/X feed",
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["https://api.anthropic.com/*"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
   "background": {
     "service_worker": "background.js"
   },

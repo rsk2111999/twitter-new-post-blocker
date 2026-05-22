@@ -304,13 +304,28 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .digest-api-row {
+    .digest-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: #536471;
+    }
+    .ollama-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #536471;
+      transition: background 0.3s;
+    }
+    .ollama-dot.online  { background: #00ba7c; }
+    .ollama-dot.offline { background: #f4212e; }
+    .digest-model-row {
       display: flex;
       align-items: center;
       gap: 6px;
       margin-bottom: 10px;
     }
-    .digest-api-wrap {
+    .digest-model-wrap {
       flex: 1;
       border: 2px solid #333639;
       border-radius: 4px;
@@ -318,8 +333,8 @@
       background: #000;
       transition: border-color 0.2s;
     }
-    .digest-api-wrap:focus-within { border-color: #1d9bf0; }
-    .digest-api-input {
+    .digest-model-wrap:focus-within { border-color: #1d9bf0; }
+    .digest-model-input {
       width: 100%;
       background: none;
       border: none;
@@ -328,22 +343,7 @@
       font-size: 12px;
       font-family: inherit;
     }
-    .digest-api-input::placeholder { color: #536471; }
-    .digest-save-btn {
-      background: none;
-      border: 1px solid #2f3336;
-      border-radius: 9999px;
-      color: #1d9bf0;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 0 12px;
-      height: 28px;
-      cursor: pointer;
-      font-family: inherit;
-      white-space: nowrap;
-      transition: background 0.15s;
-    }
-    .digest-save-btn:hover { background: #0d1117; }
+    .digest-model-input::placeholder { color: #536471; }
     .digest-topics {
       display: flex;
       flex-wrap: wrap;
@@ -388,14 +388,21 @@
     }
     .digest-generate-btn:hover { background: #1a8cd8; }
     .digest-generate-btn:disabled { background: #1a3a4a; color: #536471; cursor: default; }
-    .digest-no-key {
+    .digest-hint {
       font-size: 11px;
       color: #536471;
-      font-style: italic;
       text-align: center;
-      padding: 4px 0 2px;
+      padding: 5px 0 0;
+      line-height: 1.4;
     }
-    .digest-no-key a { color: #1d9bf0; text-decoration: none; }
+    .digest-hint code {
+      background: #16202a;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: ui-monospace, monospace;
+      font-size: 10px;
+      color: #e7e9ea;
+    }
 
     /* ── Status ── */
     .status-bar {
@@ -542,15 +549,18 @@
   <div class="digest-section">
     <div class="digest-header">
       <span class="digest-title">✦ AI Digest</span>
+      <div class="digest-status">
+        <div class="ollama-dot" id="ollamaDot"></div>
+        <span id="ollamaStatus">checking…</span>
+      </div>
     </div>
 
-    <!-- API key row -->
-    <div class="digest-api-row">
-      <div class="digest-api-wrap">
-        <input class="digest-api-input" id="digestApiKey" type="password"
-          placeholder="sk-ant-… (your Anthropic API key)" autocomplete="off" />
+    <!-- Model row -->
+    <div class="digest-model-row">
+      <div class="digest-model-wrap">
+        <input class="digest-model-input" id="digestModel"
+          placeholder="model name (e.g. llama3.2)" autocomplete="off" />
       </div>
-      <button class="digest-save-btn" id="digestSaveKey">Save</button>
     </div>
 
     <!-- Topic chips -->
@@ -564,14 +574,15 @@
     </div>
 
     <!-- Generate button -->
-    <button class="digest-generate-btn" id="digestGenerateBtn" disabled>
+    <button class="digest-generate-btn" id="digestGenerateBtn">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
       </svg>
       Generate Digest
     </button>
-    <p class="digest-no-key" id="digestNoKeyHint" style="display:none">
-      Add your <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic API key</a> to use this feature
+    <p class="digest-hint" id="digestHint" style="display:none">
+      Needs <a href="https://ollama.com" target="_blank" style="color:#1d9bf0;text-decoration:none">Ollama</a> running locally ·
+      <code>ollama serve</code> · then <code>ollama pull llama3.2</code>
     </p>
   </div>
 

@@ -24,11 +24,12 @@ const breakTime      = document.getElementById('breakTime');
 const breakCancel    = document.getElementById('breakCancel');
 
 // Digest
-const digestApiKey      = document.getElementById('digestApiKey');
-const digestSaveKey     = document.getElementById('digestSaveKey');
+const digestModel       = document.getElementById('digestModel');
 const digestTopics      = document.getElementById('digestTopics');
 const digestGenerateBtn = document.getElementById('digestGenerateBtn');
-const digestNoKeyHint   = document.getElementById('digestNoKeyHint');
+const digestHint        = document.getElementById('digestHint');
+const ollamaDot         = document.getElementById('ollamaDot');
+const ollamaStatus      = document.getElementById('ollamaStatus');
 
 // Allowlist
 const allowlistChips    = document.getElementById('allowlistChips');
@@ -231,9 +232,27 @@ function getSelectedTopics() {
     .map(c => c.dataset.topic);
 }
 
-function setDigestReady(hasKey) {
-  digestGenerateBtn.disabled = !hasKey;
-  digestNoKeyHint.style.display = hasKey ? 'none' : 'block';
+// Ping Ollama on popup open
+function checkOllama() {
+  chrome.runtime.sendMessage({ type: 'checkOllama' }, (resp) => {
+    if (resp?.ok) {
+      ollamaDot.className = 'ollama-dot online';
+      const modelCount = resp.models.length;
+      ollamaStatus.textContent = modelCount
+        ? `${modelCount} model${modelCount > 1 ? 's' : ''}`
+        : 'running';
+      digestHint.style.display = 'none';
+      // Populate model input placeholder with first available model
+      if (resp.models.length && !digestModel.value) {
+        const preferred = resp.models.find(m => m.startsWith('llama')) || resp.models[0];
+        digestModel.placeholder = preferred;
+      }
+    } else {
+      ollamaDot.className = 'ollama-dot offline';
+      ollamaStatus.textContent = 'not running';
+      digestHint.style.display = 'block';
+    }
+  });
 }
 
 // Topic chip toggles
@@ -241,62 +260,58 @@ digestTopics.addEventListener('click', (e) => {
   const chip = e.target.closest('.topic-chip');
   if (!chip) return;
   chip.classList.toggle('selected');
-  // Save selection
-  const selected = getSelectedTopics();
-  chrome.storage.local.set({ digestTopics: selected });
+  chrome.storage.local.set({ digestTopics: getSelectedTopics() });
 });
 
-// Save / update API key
-digestSaveKey.addEventListener('click', () => {
-  const val = digestApiKey.value.trim();
-  if (!val) return;
-  chrome.storage.local.set({ digestApiKey: val }, () => {
-    setDigestReady(true);
-    digestApiKey.value = '';
-    digestSaveKey.textContent = 'Saved ✓';
-    setTimeout(() => { digestSaveKey.textContent = 'Save'; }, 1800);
-  });
-});
-digestApiKey.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') digestSaveKey.click();
+// Save model name on change
+digestModel.addEventListener('change', () => {
+  const val = digestModel.value.trim();
+  if (val) chrome.storage.local.set({ digestModelName: val });
 });
 
-// Generate digest
+// Generate
 digestGenerateBtn.addEventListener('click', () => {
-  chrome.storage.local.get({ digestApiKey: '', digestTopics: ['AI & ML', 'Tech'] }, ({ digestApiKey: key, digestTopics: topics }) => {
-    if (!key) { setDigestReady(false); return; }
+  chrome.storage.local.get({ digestModelName: '', digestTopics: ['AI & ML', 'Tech'] }, ({ digestModelName, digestTopics: savedTopics }) => {
+    // Use typed value → saved value → placeholder (auto-detected) → fallback
+    const model = digestModel.value.trim()
+      || digestModelName
+      || digestModel.placeholder.replace('e.g. ', '')
+      || 'llama3.2';
 
-    const activeTopics = getSelectedTopics().length > 0 ? getSelectedTopics() : topics;
+    const topics = getSelectedTopics().length > 0 ? getSelectedTopics() : savedTopics;
 
     digestGenerateBtn.disabled = true;
-    digestGenerateBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="animation:spin 0.8s linear infinite"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg> Generating…`;
+    digestGenerateBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"
+        style="animation:spin 0.8s linear infinite">
+        <path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/>
+      </svg> Generating…`;
 
-    // Inject spin animation if not present
-    if (!document.getElementById('spin-style')) {
+    if (!document.getElementById('digest-spin')) {
       const s = document.createElement('style');
-      s.id = 'spin-style';
+      s.id = 'digest-spin';
       s.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
       document.head.appendChild(s);
     }
 
-    chrome.runtime.sendMessage({ type: 'generateDigest', apiKey: key, topics: activeTopics }, () => {
+    chrome.runtime.sendMessage({ type: 'generateDigest', model, topics }, () => {
       digestGenerateBtn.disabled = false;
-      digestGenerateBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Generate Digest`;
-      window.close(); // close popup so user can see the panel
+      digestGenerateBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+        </svg> Generate Digest`;
+      window.close(); // show the panel behind the popup
     });
   });
 });
 
 // Boot digest state
-chrome.storage.local.get({ digestApiKey: '', digestTopics: ['AI & ML', 'Tech'] }, ({ digestApiKey: key, digestTopics: savedTopics }) => {
-  setDigestReady(!!key);
-  if (key) {
-    digestApiKey.placeholder = '••••••••••••••••• (saved)';
-  }
-  // Restore topic selection
+chrome.storage.local.get({ digestModelName: '', digestTopics: ['AI & ML', 'Tech'] }, ({ digestModelName, digestTopics: savedTopics }) => {
+  if (digestModelName) digestModel.value = digestModelName;
   digestTopics.querySelectorAll('.topic-chip').forEach((chip) => {
     chip.classList.toggle('selected', savedTopics.includes(chip.dataset.topic));
   });
+  checkOllama();
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
