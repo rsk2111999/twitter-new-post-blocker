@@ -1,15 +1,37 @@
 'use strict';
 
-const toggle       = document.getElementById('toggle');
-const schedToggle  = document.getElementById('scheduleToggle');
-const schedBody    = document.getElementById('scheduleBody');
-const schedDesc    = document.getElementById('scheduleDesc');
-const startTime    = document.getElementById('startTime');
-const endTime      = document.getElementById('endTime');
-const statusPill   = document.getElementById('statusPill');
-const statusText   = document.getElementById('statusText');
-const quoteEl      = document.getElementById('quote');
+// ── Elements ──────────────────────────────────────────────────────────────────
+const toggle         = document.getElementById('toggle');
+const schedToggle    = document.getElementById('scheduleToggle');
+const schedBody      = document.getElementById('scheduleBody');
+const schedDesc      = document.getElementById('scheduleDesc');
+const startTimeEl    = document.getElementById('startTime');
+const endTimeEl      = document.getElementById('endTime');
+const statusPill     = document.getElementById('statusPill');
+const statusText     = document.getElementById('statusText');
+const quoteEl        = document.getElementById('quote');
 
+// Stats
+const statStreak     = document.getElementById('statStreak');
+const statToday      = document.getElementById('statToday');
+const statTotal      = document.getElementById('statTotal');
+
+// Break
+const breakSection   = document.getElementById('breakSection');
+const breakBtns      = document.getElementById('breakBtns');
+const breakActive    = document.getElementById('breakActive');
+const breakTime      = document.getElementById('breakTime');
+const breakCancel    = document.getElementById('breakCancel');
+
+// Allowlist
+const allowlistChips    = document.getElementById('allowlistChips');
+const allowlistEmpty    = document.getElementById('allowlistEmpty');
+const allowlistAddBtn   = document.getElementById('allowlistAddBtn');
+const allowlistInputRow = document.getElementById('allowlistInputRow');
+const allowlistInput    = document.getElementById('allowlistInput');
+const allowlistConfirm  = document.getElementById('allowlistConfirm');
+
+// ── Quotes ────────────────────────────────────────────────────────────────────
 const QUOTES = [
   "Your life is worth more than this feed.",
   "Go touch grass. Seriously.",
@@ -17,18 +39,21 @@ const QUOTES = [
   "The world outside has no character limit.",
   "Skill issue: the algorithm. Winner: you.",
   "Those tweets weren't going to change your life.",
-  "Outside is still there. Just checking.",
   "Drink some water. That's the real hot take.",
 ];
+const randomQuote = () => QUOTES[Math.floor(Math.random() * QUOTES.length)];
 
-function randomQuote() {
-  return QUOTES[Math.floor(Math.random() * QUOTES.length)];
-}
-
+// ── Formatting ────────────────────────────────────────────────────────────────
 function fmt(t) {
   const [h, m] = t.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
+function fmtMs(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function isWithinSchedule(s, e) {
@@ -40,31 +65,122 @@ function isWithinSchedule(s, e) {
   return sv <= ev ? (cur >= sv && cur < ev) : (cur >= sv || cur < ev);
 }
 
-function updateUI({ enabled, scheduleEnabled, startTime: s, endTime: e }) {
-  toggle.checked     = enabled;
-  schedToggle.checked = scheduleEnabled;
-  startTime.value    = s;
-  endTime.value      = e;
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function loadStats() {
+  chrome.storage.local.get(
+    { todayBlocked: 0, streak: 0, totalBlocked: 0 },
+    ({ todayBlocked, streak, totalBlocked }) => {
+      statStreak.textContent = streak;
+      statToday.textContent  = todayBlocked;
+      statTotal.textContent  = totalBlocked;
+    }
+  );
+}
 
-  // Show/hide time pickers
-  const showPickers = enabled && scheduleEnabled;
-  schedBody.classList.toggle('open', showPickers);
-  schedToggle.closest('.toggle-wrap').style.opacity = enabled ? '1' : '0.4';
-  schedToggle.closest('.toggle-wrap').style.pointerEvents = enabled ? '' : 'none';
+// ── Break timer ───────────────────────────────────────────────────────────────
+let breakInterval = null;
 
-  // Schedule description
-  schedDesc.textContent = scheduleEnabled && enabled
-    ? `${fmt(s)} – ${fmt(e)}`
-    : 'Only block during specific hours';
+function startBreakCountdown(breakUntil) {
+  breakBtns.style.display   = 'none';
+  breakActive.classList.add('visible');
+  clearInterval(breakInterval);
+  breakInterval = setInterval(() => {
+    const remaining = breakUntil - Date.now();
+    if (remaining <= 0) {
+      clearInterval(breakInterval);
+      breakBtns.style.display = 'flex';
+      breakActive.classList.remove('visible');
+      breakTime.textContent = '–';
+    } else {
+      breakTime.textContent = fmtMs(remaining);
+    }
+  }, 500);
+  breakTime.textContent = fmtMs(breakUntil - Date.now());
+}
 
-  // Status pill
+function stopBreakCountdown() {
+  clearInterval(breakInterval);
+  breakBtns.style.display = 'flex';
+  breakActive.classList.remove('visible');
+}
+
+document.querySelectorAll('.break-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const mins = parseInt(btn.dataset.mins, 10);
+    const breakUntil = Date.now() + mins * 60 * 1000;
+    chrome.storage.sync.set({ breakUntil });
+    startBreakCountdown(breakUntil);
+    updateStatus(toggle.checked, schedToggle.checked, startTimeEl.value, endTimeEl.value, breakUntil);
+  });
+});
+
+breakCancel.addEventListener('click', () => {
+  chrome.storage.sync.set({ breakUntil: 0 });
+  stopBreakCountdown();
+  updateStatus(toggle.checked, schedToggle.checked, startTimeEl.value, endTimeEl.value, 0);
+});
+
+// ── Allowlist ─────────────────────────────────────────────────────────────────
+let allowlist = [];
+
+function renderChips() {
+  allowlistChips.innerHTML = '';
+  if (allowlist.length === 0) {
+    allowlistChips.appendChild(allowlistEmpty);
+    allowlistEmpty.style.display = 'inline';
+    return;
+  }
+  allowlistEmpty.style.display = 'none';
+  allowlist.forEach((handle) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `@${handle} <button class="chip-remove" data-handle="${handle}">×</button>`;
+    chip.querySelector('.chip-remove').addEventListener('click', () => {
+      allowlist = allowlist.filter(h => h !== handle);
+      chrome.storage.sync.set({ allowlist });
+      renderChips();
+    });
+    allowlistChips.appendChild(chip);
+  });
+}
+
+allowlistAddBtn.addEventListener('click', () => {
+  allowlistInputRow.classList.toggle('visible');
+  if (allowlistInputRow.classList.contains('visible')) allowlistInput.focus();
+});
+
+function addHandle() {
+  const val = allowlistInput.value.trim().replace(/^@/, '').toLowerCase();
+  if (!val || allowlist.includes(val)) { allowlistInput.value = ''; return; }
+  allowlist = [...allowlist, val];
+  chrome.storage.sync.set({ allowlist });
+  renderChips();
+  allowlistInput.value = '';
+  allowlistInputRow.classList.remove('visible');
+}
+
+allowlistConfirm.addEventListener('click', addHandle);
+allowlistInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addHandle(); });
+
+// ── Status pill ───────────────────────────────────────────────────────────────
+function updateStatus(enabled, scheduleEnabled, s, e, breakUntil) {
   if (!enabled) {
     statusPill.className = 'status-pill';
     statusText.textContent = 'Blocking off';
     quoteEl.className = 'quote';
+    breakSection.style.opacity = '0.4';
+    breakSection.style.pointerEvents = 'none';
     return;
   }
+  breakSection.style.opacity = '';
+  breakSection.style.pointerEvents = '';
 
+  if (breakUntil && Date.now() < breakUntil) {
+    statusPill.className = 'status-pill';
+    statusText.textContent = 'On a break · resuming soon';
+    quoteEl.className = 'quote';
+    return;
+  }
   if (!scheduleEnabled) {
     statusPill.className = 'status-pill active';
     statusText.textContent = 'Blocking all day';
@@ -72,31 +188,56 @@ function updateUI({ enabled, scheduleEnabled, startTime: s, endTime: e }) {
     quoteEl.className = 'quote visible';
     return;
   }
-
   const within = isWithinSchedule(s, e);
   statusPill.className = within ? 'status-pill active' : 'status-pill';
-  statusText.textContent = within
-    ? `Blocking · until ${fmt(e)}`
-    : `Paused · resumes ${fmt(s)}`;
+  statusText.textContent = within ? `Blocking · until ${fmt(e)}` : `Paused · resumes ${fmt(s)}`;
   quoteEl.textContent = within ? randomQuote() : '';
   quoteEl.className = within ? 'quote visible' : 'quote';
 }
 
+// ── Settings toggles ──────────────────────────────────────────────────────────
 function save() {
   const state = {
     enabled:         toggle.checked,
     scheduleEnabled: schedToggle.checked,
-    startTime:       startTime.value,
-    endTime:         endTime.value,
+    startTime:       startTimeEl.value,
+    endTime:         endTimeEl.value,
   };
   chrome.storage.sync.set(state);
-  updateUI(state);
+
+  schedBody.classList.toggle('open', state.enabled && state.scheduleEnabled);
+  schedDesc.textContent = state.scheduleEnabled && state.enabled
+    ? `${fmt(state.startTime)} – ${fmt(state.endTime)}`
+    : 'Only block during specific hours';
+
+  chrome.storage.sync.get({ breakUntil: 0 }, ({ breakUntil }) => {
+    updateStatus(state.enabled, state.scheduleEnabled, state.startTime, state.endTime, breakUntil);
+  });
 }
 
-chrome.storage.sync.get(
-  { enabled: true, scheduleEnabled: false, startTime: '09:00', endTime: '18:00' },
-  updateUI
-);
-
 [toggle, schedToggle].forEach(el => el.addEventListener('change', save));
-[startTime, endTime].forEach(el => el.addEventListener('change', save));
+[startTimeEl, endTimeEl].forEach(el => el.addEventListener('change', save));
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+chrome.storage.sync.get(
+  { enabled: true, scheduleEnabled: false, startTime: '09:00', endTime: '18:00', breakUntil: 0, allowlist: [] },
+  (state) => {
+    toggle.checked      = state.enabled;
+    schedToggle.checked = state.scheduleEnabled;
+    startTimeEl.value   = state.startTime;
+    endTimeEl.value     = state.endTime;
+    allowlist           = state.allowlist || [];
+
+    schedBody.classList.toggle('open', state.enabled && state.scheduleEnabled);
+    schedDesc.textContent = state.scheduleEnabled && state.enabled
+      ? `${fmt(state.startTime)} – ${fmt(state.endTime)}`
+      : 'Only block during specific hours';
+
+    const bu = state.breakUntil || 0;
+    if (bu && Date.now() < bu) startBreakCountdown(bu);
+
+    updateStatus(state.enabled, state.scheduleEnabled, state.startTime, state.endTime, bu);
+    renderChips();
+    loadStats();
+  }
+);
